@@ -1,0 +1,43 @@
+# Traefik v3 static configuration
+# Dynamic routing is handled via Docker labels on individual services.
+
+api:
+  dashboard: true
+
+log:
+  level: INFO
+
+entryPoints:
+  dashboard:
+    address: ":8080"
+
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+
+  websecure:
+    address: ":443"
+    http:
+      tls:
+        certResolver: letsencrypt
+
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      # email is set via TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_EMAIL env var
+      storage: /etc/traefik/acme.json
+      httpChallenge:
+        entryPoint: web
+      # Uncomment the line below to use Let's Encrypt staging server during testing.
+      # This avoids rate limits. Switch back to production when ready to deploy.
+      # caServer: https://acme-staging-v02.api.letsencrypt.org/directory
+
+providers:
+  docker:
+    endpoint: unix:///var/run/docker.sock
+    exposedByDefault: false
+    network: proxy
