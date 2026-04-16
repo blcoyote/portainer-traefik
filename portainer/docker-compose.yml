@@ -3,6 +3,7 @@ services:
     image: portainer/portainer-ce:lts
     container_name: portainer
     restart: unless-stopped
+    command: --admin-password=${PORTAINER_ADMIN_PASSWORD_HASH}
     ports:
       - "127.0.0.1:9443:9443"
     volumes:
