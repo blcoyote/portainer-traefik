@@ -1,11 +1,11 @@
 # Traefik & Portainer Docker Compose Stack
 
-Reverse proxy with automatic Let's Encrypt SSL (Traefik) and container management UI (Portainer) for `elcoyote.dk`.
+Reverse proxy with automatic Let's Encrypt SSL (Traefik) and container management UI (Portainer) for apps.
 
 ## Prerequisites
 
 - Docker and Docker Compose installed and running
-- Public DNS for `elcoyote.dk` (and subdomains) pointing to the host
+- Public DNS for (and subdomains) pointing to the host
 - Ports 80 and 443 open on the host firewall
 
 ## Quick start
@@ -46,7 +46,7 @@ services:
       - proxy
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.whoami.rule=Host(`whoami.elcoyote.dk`)"
+      - "traefik.http.routers.whoami.rule=Host(`whoami.mysite.com`)"
       - "traefik.http.routers.whoami.entrypoints=websecure"
       - "traefik.http.routers.whoami.tls.certresolver=letsencrypt"
 
