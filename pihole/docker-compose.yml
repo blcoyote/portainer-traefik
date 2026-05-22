@@ -9,16 +9,13 @@ services:
       - "0.0.0.0:8053:80"
     environment:
       TZ: ${TZ:-UTC}
-      WEBPASSWORD: ${PIHOLE_WEBPASSWORD}
-      PIHOLE_DNS_: ${PIHOLE_UPSTREAM_DNS:-1.1.1.1;8.8.8.8}
-      DNSMASQ_LISTENING: all
+      FTLCONF_webserver_api_password: ${PIHOLE_WEBPASSWORD}
+      FTLCONF_dns_upstreams: ${PIHOLE_UPSTREAM_DNS:-1.1.1.1;8.8.8.8}
+      FTLCONF_dns_listeningMode: ALL
     volumes:
       - pihole_data:/etc/pihole
-      - pihole_dnsmasq:/etc/dnsmasq.d
-      - ./dnsmasq-custom.conf:/etc/dnsmasq.d/99-custom.conf:ro
     labels:
       - "traefik.enable=false"
 
 volumes:
   pihole_data:
-  pihole_dnsmasq:
