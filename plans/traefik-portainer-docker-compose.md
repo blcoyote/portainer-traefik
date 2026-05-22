@@ -7,7 +7,7 @@
 
 ## Goal
 
-Create a production-ready Docker Compose stack that runs Traefik as a reverse proxy with automatic Let's Encrypt SSL for `elcoyote.dk`, and Portainer as an internal-only container management UI. The setup must be self-contained with persistent data, separated configuration directories, and allow future services to opt into Traefik routing via Docker labels.
+Create a production-ready Docker Compose stack that runs Traefik as a reverse proxy with automatic Let's Encrypt SSL for `example.com`, and Portainer as an internal-only container management UI. The setup must be self-contained with persistent data, separated configuration directories, and allow future services to opt into Traefik routing via Docker labels.
 
 ## Acceptance Criteria
 
@@ -32,7 +32,7 @@ Feature: Traefik reverse proxy with Let's Encrypt SSL
 
   Scenario: Traefik obtains SSL certificate from Let's Encrypt
     When Traefik starts for the first time
-    Then it registers with Let's Encrypt using "blc@elcoyote.dk"
+    Then it registers with Let's Encrypt using "admin@example.com"
     And it stores the ACME certificate data in "traefik/acme.json"
     And the certificate data persists across container restarts
 
@@ -41,8 +41,8 @@ Feature: Traefik reverse proxy with Let's Encrypt SSL
     Then the client receives a 301 redirect to the HTTPS URL on port 443
 
   Scenario: HTTPS traffic is terminated by Traefik
-    Given a service is running with Traefik labels for "app.elcoyote.dk"
-    When a client sends an HTTPS request to "app.elcoyote.dk"
+    Given a service is running with Traefik labels for "app.example.com"
+    When a client sends an HTTPS request to "app.example.com"
     Then Traefik terminates TLS and forwards the request to the service
 
   Scenario: Service opts into Traefik routing via Docker labels
@@ -101,7 +101,7 @@ Feature: Traefik reverse proxy with Let's Encrypt SSL
 **GREEN**: Create `traefik/traefik.yml` with:
 - Entrypoints: `web` (port 80), `websecure` (port 443)
 - HTTP-to-HTTPS redirect on the `web` entrypoint
-- ACME/Let's Encrypt certificate resolver: HTTP-01 challenge, email `blc@elcoyote.dk`, storage `/etc/traefik/acme.json`
+- ACME/Let's Encrypt certificate resolver: HTTP-01 challenge, email `admin@example.com`, storage `/etc/traefik/acme.json`
 - Let's Encrypt staging CA URL commented out with instructions to switch for testing
 - Docker provider enabled with `exposedByDefault: false`
 - API/dashboard enabled
@@ -172,7 +172,7 @@ Feature: Traefik reverse proxy with Let's Encrypt SSL
 
 ## Risks & Open Questions
 
-- **DNS dependency**: AC-2 and AC-3 can only be fully verified on the target host where `elcoyote.dk` DNS resolves. Local validation is limited to `docker compose config` parsing.
+- **DNS dependency**: AC-2 and AC-3 can only be fully verified on the target host where `example.com` DNS resolves. Local validation is limited to `docker compose config` parsing.
 - **Let's Encrypt rate limits**: Use the staging CA URL (`https://acme-staging-v02.api.letsencrypt.org/directory`) during iterative testing. The `traefik.yml` includes the staging URL as a commented-out option.
 - **Docker socket security**: Mounting the Docker socket (even read-only) gives Traefik visibility into all containers. This is an accepted trade-off for Docker label-based routing. A future hardening step would be a Docker socket proxy (e.g., `tecnativa/docker-socket-proxy`).
 - **Portainer network exposure**: Portainer is on the `proxy` network with `traefik.enable=false`. Misconfiguration of this label would expose Portainer through Traefik. The README documents this risk.
