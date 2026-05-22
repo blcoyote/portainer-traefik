@@ -15,6 +15,7 @@ services:
     volumes:
       - pihole_data:/etc/pihole
       - pihole_dnsmasq:/etc/dnsmasq.d
+      - ./dnsmasq-custom.conf:/etc/dnsmasq.d/99-custom.conf:ro
     labels:
       - "traefik.enable=false"
 
