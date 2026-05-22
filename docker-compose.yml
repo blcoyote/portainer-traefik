@@ -1,4 +1,5 @@
 include:
-  - traefik/docker-compose.yml
+  #- traefik/docker-compose.yml
   - portainer/docker-compose.yml
-  - pihole/docker-compose.yml
+  #- pihole/docker-compose.yml
+

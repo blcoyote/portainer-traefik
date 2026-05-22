@@ -4,12 +4,13 @@ services:
     container_name: traefik
     restart: unless-stopped
     ports:
-      - "0.0.0.0:80:80"
-      - "0.0.0.0:443:443"
-      - "0.0.0.0:8080:8080"
+      - "10080:80"
+      - "10443:443"
+      - "18080:8080"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./dynamic.yml:/etc/traefik/dynamic.yml:ro
       - ./acme.json:/etc/traefik/acme.json
     environment:
       - TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_EMAIL=${ACME_EMAIL}
@@ -25,4 +26,4 @@ services:
 
 networks:
   proxy:
-    external: true
+    name: proxy

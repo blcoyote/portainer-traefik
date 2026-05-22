@@ -3,22 +3,20 @@ services:
     image: portainer/portainer-ee:lts
     container_name: portainer
     restart: unless-stopped
-    command: --admin-password=${PORTAINER_ADMIN_PASSWORD_HASH}
+    #command: --admin-password=${PORTAINER_ADMIN_PASSWORD_HASH}
     ports:
       - 9443:9443
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - portainer_data:/data
-    networks:
-      - proxy
+
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.portainer.rule=Host(`${PORTAINER_HOSTNAME}`)"
       - "traefik.http.routers.portainer.entrypoints=websecure"
       - "traefik.http.services.portainer.loadbalancer.server.port=9443"
       - "traefik.http.services.portainer.loadbalancer.server.scheme=https"
-      - "traefik.http.serversTransports.portainer-transport.insecureSkipVerify=true"
-      - "traefik.http.services.portainer.loadbalancer.serverstransport=portainer-transport"
+      - "traefik.http.services.portainer.loadbalancer.serverstransport=portainer-transport@file"
 
 volumes:
   portainer_data:
@@ -27,5 +25,4 @@ volumes:
 networks:
   default:
     name: portainer_network
-  proxy:
-    external: true
+
