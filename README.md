@@ -87,7 +87,7 @@ Traefik configuration is split in two:
 `tailscale/docker-compose.yml` runs a Tailscale VPN gateway for mobile devices. Phones and laptops running the Tailscale app connect to it from anywhere and are routed into the **physical local network** (NAS, printers, router, other hosts) — not just the Docker networks. It can optionally act as an exit node so all mobile traffic goes out through your home connection.
 
 ```
-phone (Tailscale app) ──tailnet──▶ tailscale container (host network) ──▶ LAN 192.168.1.0/24
+phone (Tailscale app) ──tailnet──▶ tailscale container (host network) ──▶ LAN 192.168.0.0/24
 ```
 
 ### Configuration
@@ -98,9 +98,23 @@ Set these in `tailscale/.env` (or in the Portainer stack environment):
 |----------|---------|---------|
 | `TS_AUTHKEY` | — (required) | Auth key from the Tailscale admin console (Settings → Keys). Use a reusable or non-expiring key for a server |
 | `TS_HOSTNAME` | `homelab-vpn` | Machine name shown in the tailnet |
-| `TS_ROUTES` | `192.168.1.0/24` | Your LAN subnet(s) to expose to mobile clients, comma-separated |
+| `TS_ROUTES` | `192.168.0.0/24` | Your LAN subnet(s) to expose to mobile clients, comma-separated |
 | `TS_LOGIN_SERVER` | `https://controlplane.tailscale.com` | Coordination server. Set to your Headscale URL to self-host (see below) |
 | `TS_EXTRA_ARGS` | `--advertise-exit-node` | Extra `tailscale up` flags. Set to empty to disable the exit node |
+
+### Address ranges
+
+VPN clients never get addresses on your LAN, so they cannot collide with LAN devices:
+
+| Network | Range |
+|---------|-------|
+| Home LAN (routed to VPN clients via `TS_ROUTES`) | `192.168.0.0/24` |
+| Tailnet / VPN clients | `100.64.0.0/10` (CGNAT range, assigned by Tailscale/Headscale) |
+| Docker networks | `172.16.0.0/12` (Docker default) |
+
+The gateway routes between the tailnet and the LAN, and SNATs client traffic to the host's LAN IP.
+
+One collision is outside your control: if a phone joins a remote Wi-Fi that also uses `192.168.0.0/24`, that local network and the advertised route overlap and LAN hosts may be unreachable from it. Use mobile data in that case, or move the home LAN to a less common range (e.g. `10.20.0.0/24`).
 
 ### Host setup
 
@@ -123,7 +137,7 @@ In the [Tailscale admin console](https://login.tailscale.com/admin/machines), op
 ### Connect a mobile device
 
 1. Install the Tailscale app (iOS / Android) and sign in to the same tailnet.
-2. Turn the VPN on — LAN addresses like `192.168.1.x` are now reachable from anywhere.
+2. Turn the VPN on — LAN addresses like `192.168.0.x` are now reachable from anywhere.
 3. To route *all* traffic through home, pick this machine under **Exit node** in the app.
 
 Tip: to use Pi-hole for VPN clients, add the host's LAN IP as a nameserver under **DNS** in the admin console and enable **Override local DNS**.
@@ -186,7 +200,7 @@ If the node was previously logged in to Tailscale's cloud, remove the `tailscale
 
 ```bash
 docker exec headscale headscale nodes list                     # note the node ID
-docker exec headscale headscale nodes approve-routes -i <NODE_ID> -r 192.168.1.0/24,0.0.0.0/0,::/0
+docker exec headscale headscale nodes approve-routes -i <NODE_ID> -r 192.168.0.0/24,0.0.0.0/0,::/0
 ```
 
 Omit `0.0.0.0/0,::/0` if you don't want the exit node.

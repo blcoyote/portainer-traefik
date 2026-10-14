@@ -24,7 +24,7 @@ services:
       # Kernel networking (tailscale0 interface) is required for subnet routing.
       TS_USERSPACE: "false"
       # LAN subnet(s) mobile clients can reach, comma-separated.
-      TS_ROUTES: ${TS_ROUTES:-192.168.1.0/24}
+      TS_ROUTES: ${TS_ROUTES:-192.168.0.0/24}
       # Keep the host's own DNS; clients get DNS from the tailnet settings.
       TS_ACCEPT_DNS: "false"
       # NAT client traffic to the host's LAN IP so LAN devices need no return route.
