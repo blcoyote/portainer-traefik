@@ -1,0 +1,50 @@
+# Tailscale VPN gateway for mobile devices.
+#
+# Phones/laptops running the Tailscale app connect to this node and get
+# routed into the physical LAN (TS_ROUTES) - not just the Docker networks.
+# Optionally they can also send all internet traffic through home (exit node).
+services:
+  tailscale:
+    image: tailscale/tailscale:stable
+    container_name: tailscale
+    hostname: ${TS_HOSTNAME:-homelab-vpn}
+    restart: unless-stopped
+    # Host networking puts tailscale0 directly on the host, so traffic from
+    # VPN clients is forwarded by the host kernel onto the real LAN.
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY}
+      TS_HOSTNAME: ${TS_HOSTNAME:-homelab-vpn}
+      TS_STATE_DIR: /var/lib/tailscale
+      # Kernel networking (tailscale0 interface) is required for subnet routing.
+      TS_USERSPACE: "false"
+      # LAN subnet(s) mobile clients can reach, comma-separated.
+      TS_ROUTES: ${TS_ROUTES:-192.168.0.0/24}
+      # Keep the host's own DNS; clients get DNS from the tailnet settings.
+      TS_ACCEPT_DNS: "false"
+      # NAT client traffic to the host's LAN IP so LAN devices need no return route.
+      # Coordination server: Tailscale's cloud by default, or the headscale/
+      # stack (e.g. https://headscale.example.com).
+      TS_EXTRA_ARGS: --login-server=${TS_LOGIN_SERVER:-https://controlplane.tailscale.com} --snat-subnet-routes=true ${TS_EXTRA_ARGS---advertise-exit-node}
+      # Pick iptables or nftables to match the host firewall.
+      TS_DEBUG_FIREWALL_MODE: auto
+    volumes:
+      - tailscale_data:/var/lib/tailscale
+      - /lib/modules:/lib/modules:ro
+    healthcheck:
+      test: ["CMD", "tailscale", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      # VPN gateway has no web UI to route; keep it out of Traefik explicitly.
+      - "traefik.enable=false"
+
+volumes:
+  tailscale_data:
+    name: tailscale_data
