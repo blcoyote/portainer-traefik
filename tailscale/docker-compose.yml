@@ -1,11 +1,16 @@
+# Tailscale VPN gateway for mobile devices.
+#
+# Phones/laptops running the Tailscale app connect to this node and get
+# routed into the physical LAN (TS_ROUTES) - not just the Docker networks.
+# Optionally they can also send all internet traffic through home (exit node).
 services:
   tailscale:
     image: tailscale/tailscale:stable
     container_name: tailscale
     hostname: ${TS_HOSTNAME:-homelab-vpn}
     restart: unless-stopped
-    # Host networking lets the node route to the local LAN (subnet router)
-    # and act as an exit node without extra NAT/port mapping.
+    # Host networking puts tailscale0 directly on the host, so traffic from
+    # VPN clients is forwarded by the host kernel onto the real LAN.
     network_mode: host
     cap_add:
       - NET_ADMIN
@@ -16,14 +21,26 @@ services:
       TS_AUTHKEY: ${TS_AUTHKEY}
       TS_HOSTNAME: ${TS_HOSTNAME:-homelab-vpn}
       TS_STATE_DIR: /var/lib/tailscale
+      # Kernel networking (tailscale0 interface) is required for subnet routing.
       TS_USERSPACE: "false"
+      # LAN subnet(s) mobile clients can reach, comma-separated.
       TS_ROUTES: ${TS_ROUTES:-192.168.1.0/24}
-      TS_ACCEPT_DNS: ${TS_ACCEPT_DNS:-false}
-      TS_EXTRA_ARGS: ${TS_EXTRA_ARGS:---advertise-exit-node}
+      # Keep the host's own DNS; clients get DNS from the tailnet settings.
+      TS_ACCEPT_DNS: "false"
+      # NAT client traffic to the host's LAN IP so LAN devices need no return route.
+      TS_EXTRA_ARGS: --snat-subnet-routes=true ${TS_EXTRA_ARGS---advertise-exit-node}
+      # Pick iptables or nftables to match the host firewall.
+      TS_DEBUG_FIREWALL_MODE: auto
     volumes:
       - tailscale_data:/var/lib/tailscale
+      - /lib/modules:/lib/modules:ro
+    healthcheck:
+      test: ["CMD", "tailscale", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     labels:
-      # VPN node has no web UI to route; keep it out of Traefik explicitly.
+      # VPN gateway has no web UI to route; keep it out of Traefik explicitly.
       - "traefik.enable=false"
 
 volumes:

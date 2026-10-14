@@ -84,19 +84,26 @@ Traefik configuration is split in two:
 
 ## Tailscale VPN
 
-`tailscale/docker-compose.yml` runs a Tailscale node that gives your tailnet devices access to the local network (subnet router) and can be used as an exit node.
+`tailscale/docker-compose.yml` runs a Tailscale VPN gateway for mobile devices. Phones and laptops running the Tailscale app connect to it from anywhere and are routed into the **physical local network** (NAS, printers, router, other hosts) — not just the Docker networks. It can optionally act as an exit node so all mobile traffic goes out through your home connection.
+
+```
+phone (Tailscale app) ──tailnet──▶ tailscale container (host network) ──▶ LAN 192.168.1.0/24
+```
+
+### Configuration
 
 Set these in `tailscale/.env` (or in the Portainer stack environment):
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `TS_AUTHKEY` | — (required) | Auth key from the Tailscale admin console (Settings → Keys) |
+| `TS_AUTHKEY` | — (required) | Auth key from the Tailscale admin console (Settings → Keys). Use a reusable or non-expiring key for a server |
 | `TS_HOSTNAME` | `homelab-vpn` | Machine name shown in the tailnet |
-| `TS_ROUTES` | `192.168.1.0/24` | LAN subnet(s) to advertise, comma-separated |
-| `TS_ACCEPT_DNS` | `false` | Use tailnet DNS on this node |
-| `TS_EXTRA_ARGS` | `--advertise-exit-node` | Extra `tailscale up` flags |
+| `TS_ROUTES` | `192.168.1.0/24` | Your LAN subnet(s) to expose to mobile clients, comma-separated |
+| `TS_EXTRA_ARGS` | `--advertise-exit-node` | Extra `tailscale up` flags. Set to empty to disable the exit node |
 
-The host must allow IP forwarding for subnet routing / exit node traffic:
+### Host setup
+
+The host kernel forwards VPN traffic onto the LAN, so IP forwarding must be enabled:
 
 ```bash
 echo 'net.ipv4.ip_forward = 1' | sudo tee /etc/sysctl.d/99-tailscale.conf
@@ -104,13 +111,32 @@ echo 'net.ipv6.conf.all.forwarding = 1' | sudo tee -a /etc/sysctl.d/99-tailscale
 sudo sysctl -p /etc/sysctl.d/99-tailscale.conf
 ```
 
-Then start it and approve the advertised routes and exit node for the machine in the Tailscale admin console:
+### Start and approve
 
 ```bash
 cd tailscale && docker compose up -d
 ```
 
-The container uses host networking and has no web UI, so it carries `traefik.enable=false` (like Pi-hole). Services behind Traefik are reachable over the VPN at the host's LAN IP once the subnet route is approved.
+In the [Tailscale admin console](https://login.tailscale.com/admin/machines), open the machine → **Edit route settings** and approve the subnet route (and exit node, if wanted). Optionally disable key expiry for the machine so the server never drops off.
+
+### Connect a mobile device
+
+1. Install the Tailscale app (iOS / Android) and sign in to the same tailnet.
+2. Turn the VPN on — LAN addresses like `192.168.1.x` are now reachable from anywhere.
+3. To route *all* traffic through home, pick this machine under **Exit node** in the app.
+
+Tip: to use Pi-hole for VPN clients, add the host's LAN IP as a nameserver under **DNS** in the admin console and enable **Override local DNS**.
+
+### Notes
+
+- Client traffic is SNAT'ed to the host's LAN IP, so other LAN devices need no extra routes.
+- The container has no web UI, so it carries `traefik.enable=false` (like Pi-hole). Services behind Traefik are reachable over the VPN at the host's LAN IP.
+- Docker sets the host's iptables `FORWARD` policy to `DROP`. Tailscale adds its own accept rules, but if clients connect yet cannot reach the LAN, allow forwarding explicitly:
+
+  ```bash
+  sudo iptables -I DOCKER-USER -i tailscale0 -j ACCEPT
+  sudo iptables -I DOCKER-USER -o tailscale0 -m state --state RELATED,ESTABLISHED -j ACCEPT
+  ```
 
 ## Troubleshooting
 
