@@ -131,12 +131,14 @@ Tip: to use Pi-hole for VPN clients, add the host's LAN IP as a nameserver under
 
 - Client traffic is SNAT'ed to the host's LAN IP, so other LAN devices need no extra routes.
 - The container has no web UI, so it carries `traefik.enable=false` (like Pi-hole). Services behind Traefik are reachable over the VPN at the host's LAN IP.
-- Docker sets the host's iptables `FORWARD` policy to `DROP`. Tailscale adds its own accept rules, but if clients connect yet cannot reach the LAN, allow forwarding explicitly:
+- Docker sets the host's iptables `FORWARD` policy to `DROP`. Tailscale inserts its own `ts-forward` chain into `FORWARD`, which accepts VPN traffic and marks it for SNAT in `ts-postrouting`. If clients connect but cannot reach the LAN, check that those rules are present:
 
   ```bash
-  sudo iptables -I DOCKER-USER -i tailscale0 -j ACCEPT
-  sudo iptables -I DOCKER-USER -o tailscale0 -m state --state RELATED,ESTABLISHED -j ACCEPT
+  sudo iptables -S FORWARD | grep ts-forward
+  sudo iptables -t nat -S POSTROUTING | grep ts-postrouting
   ```
+
+  If they are missing (e.g. Docker was restarted after Tailscale and flushed them), restart the container so Tailscale re-installs them: `docker compose restart tailscale`. Avoid adding a blanket `ACCEPT` for `tailscale0` in `DOCKER-USER` — it would short-circuit `ts-forward`, skipping the SNAT mark so LAN devices could not reply.
 
 ## Troubleshooting
 
