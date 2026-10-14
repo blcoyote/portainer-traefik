@@ -99,6 +99,7 @@ Set these in `tailscale/.env` (or in the Portainer stack environment):
 | `TS_AUTHKEY` | — (required) | Auth key from the Tailscale admin console (Settings → Keys). Use a reusable or non-expiring key for a server |
 | `TS_HOSTNAME` | `homelab-vpn` | Machine name shown in the tailnet |
 | `TS_ROUTES` | `192.168.1.0/24` | Your LAN subnet(s) to expose to mobile clients, comma-separated |
+| `TS_LOGIN_SERVER` | `https://controlplane.tailscale.com` | Coordination server. Set to your Headscale URL to self-host (see below) |
 | `TS_EXTRA_ARGS` | `--advertise-exit-node` | Extra `tailscale up` flags. Set to empty to disable the exit node |
 
 ### Host setup
@@ -139,6 +140,67 @@ Tip: to use Pi-hole for VPN clients, add the host's LAN IP as a nameserver under
   ```
 
   If they are missing (e.g. Docker was restarted after Tailscale and flushed them), restart the container so Tailscale re-installs them: `docker compose restart tailscale`. Avoid adding a blanket `ACCEPT` for `tailscale0` in `DOCKER-USER` — it would short-circuit `ts-forward`, skipping the SNAT mark so LAN devices could not reply.
+
+## Headscale (self-hosted Tailscale control server)
+
+`headscale/docker-compose.yml` runs [Headscale](https://github.com/juanfont/headscale), an open-source replacement for Tailscale's coordination server. Clients log in to your own server instead of Tailscale's cloud. It is exposed through Traefik with a Let's Encrypt certificate. VPN traffic itself still flows peer-to-peer (or via Tailscale's public DERP relays); Headscale only coordinates.
+
+```
+phone ──https──▶ Traefik ──▶ headscale        (login / coordination)
+phone ◀──────── WireGuard ────────▶ tailscale container ──▶ LAN
+```
+
+### Configuration
+
+Base settings live in `headscale/config.yaml`. The deployment-specific values are set as env vars (e.g. in the Portainer stack):
+
+| Variable | Example | Purpose |
+|----------|---------|---------|
+| `HEADSCALE_HOSTNAME` | `tailscale.example.com` | Public hostname. Used for the Traefik route and as `server_url` |
+| `HEADSCALE_BASE_DOMAIN` | `ts.example.com` | MagicDNS domain for nodes. Must **not** be the same as, or a parent of, `HEADSCALE_HOSTNAME` |
+
+Any other `config.yaml` key can be overridden with `HEADSCALE_<KEY>`, using `_` for nesting (e.g. `HEADSCALE_LOG_LEVEL=debug`).
+
+DNS for `HEADSCALE_HOSTNAME` must point to the host, like any other Traefik service.
+
+### Create a user and auth key
+
+Headscale is managed via its CLI inside the container:
+
+```bash
+docker exec headscale headscale users create homelab
+docker exec headscale headscale users list                     # note the user ID
+docker exec headscale headscale preauthkeys create --user <USER_ID> --reusable --expiration 90d
+```
+
+### Connect the Tailscale gateway
+
+In the `tailscale/` stack env, set:
+
+```
+TS_LOGIN_SERVER=https://<HEADSCALE_HOSTNAME>
+TS_AUTHKEY=<preauth key from above>
+```
+
+If the node was previously logged in to Tailscale's cloud, remove the `tailscale_data` volume first so it re-registers. Then approve its LAN route (and exit node):
+
+```bash
+docker exec headscale headscale nodes list                     # note the node ID
+docker exec headscale headscale nodes approve-routes -i <NODE_ID> -r 192.168.1.0/24,0.0.0.0/0,::/0
+```
+
+Omit `0.0.0.0/0,::/0` if you don't want the exit node.
+
+### Connect a mobile device
+
+- **iOS**: Settings → Tailscale → *Alternate Coordination Server URL* → `https://<HEADSCALE_HOSTNAME>`, then log in from the app.
+- **Android**: on the login screen open the ⋮ menu → *Use an alternate server*, enter `https://<HEADSCALE_HOSTNAME>`.
+
+The app shows a registration command; run it on the host to approve the device:
+
+```bash
+docker exec headscale headscale nodes register --user homelab --key <KEY_FROM_APP>
+```
 
 ## Troubleshooting
 

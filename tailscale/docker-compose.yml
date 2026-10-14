@@ -28,7 +28,9 @@ services:
       # Keep the host's own DNS; clients get DNS from the tailnet settings.
       TS_ACCEPT_DNS: "false"
       # NAT client traffic to the host's LAN IP so LAN devices need no return route.
-      TS_EXTRA_ARGS: --snat-subnet-routes=true ${TS_EXTRA_ARGS---advertise-exit-node}
+      # Coordination server: Tailscale's cloud by default, or the headscale/
+      # stack (e.g. https://headscale.example.com).
+      TS_EXTRA_ARGS: --login-server=${TS_LOGIN_SERVER:-https://controlplane.tailscale.com} --snat-subnet-routes=true ${TS_EXTRA_ARGS---advertise-exit-node}
       # Pick iptables or nftables to match the host firewall.
       TS_DEBUG_FIREWALL_MODE: auto
     volumes:
