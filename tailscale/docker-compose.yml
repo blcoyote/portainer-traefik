@@ -1,0 +1,31 @@
+services:
+  tailscale:
+    image: tailscale/tailscale:stable
+    container_name: tailscale
+    hostname: ${TS_HOSTNAME:-homelab-vpn}
+    restart: unless-stopped
+    # Host networking lets the node route to the local LAN (subnet router)
+    # and act as an exit node without extra NAT/port mapping.
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY}
+      TS_HOSTNAME: ${TS_HOSTNAME:-homelab-vpn}
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_USERSPACE: "false"
+      TS_ROUTES: ${TS_ROUTES:-192.168.1.0/24}
+      TS_ACCEPT_DNS: ${TS_ACCEPT_DNS:-false}
+      TS_EXTRA_ARGS: ${TS_EXTRA_ARGS:---advertise-exit-node}
+    volumes:
+      - tailscale_data:/var/lib/tailscale
+    labels:
+      # VPN node has no web UI to route; keep it out of Traefik explicitly.
+      - "traefik.enable=false"
+
+volumes:
+  tailscale_data:
+    name: tailscale_data

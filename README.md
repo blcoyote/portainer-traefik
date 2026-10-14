@@ -82,6 +82,36 @@ Traefik configuration is split in two:
 - **Static config** (`traefik/traefik.yml`): entrypoints, certificate resolvers, providers. Changes require a Traefik restart.
 - **Dynamic config** (Docker labels): per-service routing rules. Traefik picks these up automatically — no restart needed.
 
+## Tailscale VPN
+
+`tailscale/docker-compose.yml` runs a Tailscale node that gives your tailnet devices access to the local network (subnet router) and can be used as an exit node.
+
+Set these in `tailscale/.env` (or in the Portainer stack environment):
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `TS_AUTHKEY` | — (required) | Auth key from the Tailscale admin console (Settings → Keys) |
+| `TS_HOSTNAME` | `homelab-vpn` | Machine name shown in the tailnet |
+| `TS_ROUTES` | `192.168.1.0/24` | LAN subnet(s) to advertise, comma-separated |
+| `TS_ACCEPT_DNS` | `false` | Use tailnet DNS on this node |
+| `TS_EXTRA_ARGS` | `--advertise-exit-node` | Extra `tailscale up` flags |
+
+The host must allow IP forwarding for subnet routing / exit node traffic:
+
+```bash
+echo 'net.ipv4.ip_forward = 1' | sudo tee /etc/sysctl.d/99-tailscale.conf
+echo 'net.ipv6.conf.all.forwarding = 1' | sudo tee -a /etc/sysctl.d/99-tailscale.conf
+sudo sysctl -p /etc/sysctl.d/99-tailscale.conf
+```
+
+Then start it and approve the advertised routes and exit node for the machine in the Tailscale admin console:
+
+```bash
+cd tailscale && docker compose up -d
+```
+
+The container uses host networking and has no web UI, so it carries `traefik.enable=false` (like Pi-hole). Services behind Traefik are reachable over the VPN at the host's LAN IP once the subnet route is approved.
+
 ## Troubleshooting
 
 ### Check Traefik logs
