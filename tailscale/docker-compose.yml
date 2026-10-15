@@ -1,0 +1,35 @@
+services:
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: tailscale
+    hostname: ${TS_HOSTNAME:-tailscale-server}
+    restart: unless-stopped
+    environment:
+      # Public Tailscale control plane (default)
+      - TS_AUTHKEY=${TS_AUTHKEY}
+      - TS_STATE_DIR=/var/lib/tailscale
+      # Userspace networking: host kernel has no iptables filter table, so kernel routing can't be used
+      - TS_USERSPACE=true
+      # Route all internet traffic for tailnet clients (exit node)
+      - TS_EXTRA_ARGS=--advertise-exit-node
+      # Optional: LAN subnets to expose, e.g. 192.168.1.0/24 (comma separated)
+      - TS_ROUTES=${TS_ROUTES:-}
+    volumes:
+      - tailscale-state:/var/lib/tailscale
+    networks:
+      - proxy
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.tailscale.rule=Host(`${TS_HOSTNAME:-tailscale-server}`)
+      - traefik.http.routers.tailscale.entrypoints=websecure
+      - traefik.http.routers.tailscale.tls.certresolver=letsencrypt
+      # shortcut: Tailscale serves no HTTP itself; point this at whatever you expose in the container
+      - traefik.http.services.tailscale.loadbalancer.server.port=8080
+
+volumes:
+  tailscale-state:
+
+networks:
+  proxy:
+    external: true
