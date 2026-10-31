@@ -1,0 +1,37 @@
+# Frigate NVR (Raspberry Pi 5 + USB Coral)
+# Updates: image tag is :stable with pull_policy: always, so redeploying the stack pulls the latest release.
+#   Back up /home/parsec/frigate_config before redeploying across a major version (config format may change).
+# First deploy:
+#   1. mkdir -p /home/parsec/frigate_config && copy ./config.yml into it, fill in the real camera/MQTT IPs.
+#   2. Ensure the recordings disk is mounted at /media/frigate on the host.
+#   3. Set FRIGATE_RTSP_PASSWORD and FRIGATE_MQTT_PASSWORD as Portainer stack env vars.
+services:
+  frigate:
+    container_name: frigate
+    image: ghcr.io/blakeblackshear/frigate:stable
+    pull_policy: always
+    restart: unless-stopped
+    stop_grace_period: 30s
+    shm_size: "256mb" # 7 cams @ 640x360 detect ≈ 160MB per Frigate's formula
+    devices:
+      - /dev/bus/usb:/dev/bus/usb # USB Coral
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /home/parsec/frigate_config:/config
+      - /media/frigate:/media/frigate
+      - type: tmpfs # recording segment cache, spares the SD card
+        target: /tmp/cache
+        tmpfs:
+          size: 1000000000
+    ports:
+      - "8971:8971" # UI/API with auth
+      - "5000:5000" # API without auth (LAN only)
+      - "8554:8554" # go2rtc RTSP restream
+      - "8555:8555/tcp" # WebRTC
+      - "8555:8555/udp" # WebRTC
+    environment:
+      TZ: Europe/Copenhagen
+      FRIGATE_RTSP_PASSWORD: ${FRIGATE_RTSP_PASSWORD}
+      FRIGATE_MQTT_PASSWORD: ${FRIGATE_MQTT_PASSWORD}
+    labels:
+      - "traefik.enable=false"

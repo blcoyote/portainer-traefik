@@ -1,0 +1,264 @@
+# Frigate 0.18 config, migrated from the 0.13 sample.config.yml.
+# Seed copy: copy to /home/parsec/frigate_config/config.yml and replace 192.168.0.x with real IPs.
+# Pi 5 has no H.264 hardware decoder, so no hwaccel_args: detect decodes the 640x360 sub-streams on CPU.
+mqtt:
+  enabled: true
+  host: 192.168.0.x # MQTT broker IP
+  port: 1883
+  topic_prefix: frigate
+  client_id: frigate
+  user: csce_app
+  password: '{FRIGATE_MQTT_PASSWORD}'
+
+detectors:
+  coral:
+    type: edgetpu
+    device: usb
+
+objects:
+  track:
+    - person
+  filters:
+    person:
+      min_score: 0.75
+
+snapshots:
+  enabled: true
+  bounding_box: true
+  quality: 90
+  retain:
+    default: 7
+    objects:
+      person: 30
+
+# 0.13 kept event recordings 7 days for person (the only tracked object) and nothing continuous.
+record:
+  enabled: true
+  continuous:
+    days: 0
+  motion:
+    days: 0
+  alerts:
+    retain:
+      days: 7
+      mode: active_objects
+  detections:
+    retain:
+      days: 7
+      mode: active_objects
+
+birdseye:
+  enabled: true
+  mode: continuous
+
+# One connection per stream to each camera; Frigate and Home Assistant read from the restream.
+go2rtc:
+  streams:
+    gavl_vest:
+      - rtsp://admin:{FRIGATE_RTSP_PASSWORD}@192.168.0.x:8554/Streaming/Channels/101
+    gavl_vest_sub:
+      - rtsp://admin:{FRIGATE_RTSP_PASSWORD}@192.168.0.x:8554/Streaming/Channels/102
+    garage:
+      - rtsp://admin:{FRIGATE_RTSP_PASSWORD}@192.168.0.x:8554/Streaming/Channels/101
+    garage_sub:
+      - rtsp://admin:{FRIGATE_RTSP_PASSWORD}@192.168.0.x:8554/Streaming/Channels/102
+    have:
+      - rtsp://admin:{FRIGATE_RTSP_PASSWORD}@192.168.0.x:8554/Streaming/Channels/101
+    have_sub:
+      - rtsp://admin:{FRIGATE_RTSP_PASSWORD}@192.168.0.x:8554/Streaming/Channels/102
+    gavl_oest:
+      - rtsp://admin:{FRIGATE_RTSP_PASSWORD}@192.168.0.x:8554/Streaming/Channels/101
+    gavl_oest_sub:
+      - rtsp://admin:{FRIGATE_RTSP_PASSWORD}@192.168.0.x:8554/Streaming/Channels/102
+    vaerksted:
+      - rtsp://admin:{FRIGATE_RTSP_PASSWORD}@192.168.0.x:8554/Streaming/Channels/101
+    vaerksted_sub:
+      - rtsp://admin:{FRIGATE_RTSP_PASSWORD}@192.168.0.x:8554/Streaming/Channels/102
+    stuen:
+      - rtsp://admin:{FRIGATE_RTSP_PASSWORD}@192.168.0.x:8554/Streaming/Channels/101
+    stuen_sub:
+      - rtsp://admin:{FRIGATE_RTSP_PASSWORD}@192.168.0.x:8554/Streaming/Channels/102
+    koekken:
+      - rtsp://admin:{FRIGATE_RTSP_PASSWORD}@192.168.0.x:8554/Streaming/Channels/101
+    koekken_sub:
+      - rtsp://admin:{FRIGATE_RTSP_PASSWORD}@192.168.0.x:8554/Streaming/Channels/102
+
+# Masks converted from 640x360 pixels to relative coordinates (0.14+ format).
+cameras:
+  gavl_vest:
+    ui:
+      order: 1
+      dashboard: true
+    ffmpeg:
+      inputs:
+        - path: rtsp://127.0.0.1:8554/gavl_vest
+          input_args: preset-rtsp-restream
+          roles:
+            - record
+        - path: rtsp://127.0.0.1:8554/gavl_vest_sub
+          input_args: preset-rtsp-restream
+          roles:
+            - detect
+    detect:
+      enabled: true
+      width: 640
+      height: 360
+      fps: 5
+    motion:
+      mask:
+        mask1:
+          coordinates: "0.542,0.236,0.541,0.064,0.355,0.058,0.355,0.228"
+
+  garage:
+    ui:
+      order: 2
+      dashboard: true
+    ffmpeg:
+      inputs:
+        - path: rtsp://127.0.0.1:8554/garage
+          input_args: preset-rtsp-restream
+          roles:
+            - record
+        - path: rtsp://127.0.0.1:8554/garage_sub
+          input_args: preset-rtsp-restream
+          roles:
+            - detect
+    detect:
+      enabled: true
+      width: 640
+      height: 360
+      fps: 5
+    motion:
+      mask:
+        mask1:
+          coordinates: "0.272,0.000,0.277,0.108,0.000,0.111,0.000,0.000"
+
+  have:
+    ui:
+      order: 3
+      dashboard: true
+    ffmpeg:
+      inputs:
+        - path: rtsp://127.0.0.1:8554/have
+          input_args: preset-rtsp-restream
+          roles:
+            - record
+        - path: rtsp://127.0.0.1:8554/have_sub
+          input_args: preset-rtsp-restream
+          roles:
+            - detect
+    detect:
+      enabled: true
+      width: 640
+      height: 360
+      fps: 5
+    objects:
+      filters:
+        person:
+          mask:
+            person_mask1:
+              coordinates: "0.044,0.183,0.098,0.178,0.108,0.356,0.055,0.347"
+            person_mask2:
+              coordinates: "1.000,1.000,0.625,1.000,0.772,0.000,1.000,0.000"
+    motion:
+      mask:
+        mask1:
+          coordinates: "0.000,0.000,0.000,0.111,0.286,0.117,0.281,0.000"
+        mask2:
+          coordinates: "1.000,1.000,0.606,1.000,0.722,0.000,1.000,0.000"
+        mask3:
+          coordinates: "0.122,0.344,0.120,0.114,0.000,0.114,0.000,0.347"
+
+  gavl_oest:
+    ui:
+      order: 4
+      dashboard: true
+    ffmpeg:
+      inputs:
+        - path: rtsp://127.0.0.1:8554/gavl_oest
+          input_args: preset-rtsp-restream
+          roles:
+            - record
+        - path: rtsp://127.0.0.1:8554/gavl_oest_sub
+          input_args: preset-rtsp-restream
+          roles:
+            - detect
+    detect:
+      enabled: true
+      width: 640
+      height: 360
+      fps: 5
+    motion:
+      mask:
+        mask1:
+          coordinates: "0.277,0.000,0.000,0.000,0.000,0.128,0.275,0.117"
+
+  vaerksted:
+    ui:
+      order: 5
+      dashboard: true
+    ffmpeg:
+      inputs:
+        - path: rtsp://127.0.0.1:8554/vaerksted
+          input_args: preset-rtsp-restream
+          roles:
+            - record
+        - path: rtsp://127.0.0.1:8554/vaerksted_sub
+          input_args: preset-rtsp-restream
+          roles:
+            - detect
+    detect:
+      enabled: true
+      width: 640
+      height: 360
+      fps: 5
+
+  stuen:
+    ui:
+      order: 6
+      dashboard: true
+    ffmpeg:
+      inputs:
+        - path: rtsp://127.0.0.1:8554/stuen
+          input_args: preset-rtsp-restream
+          roles:
+            - record
+        - path: rtsp://127.0.0.1:8554/stuen_sub
+          input_args: preset-rtsp-restream
+          roles:
+            - detect
+    detect:
+      enabled: true
+      width: 640
+      height: 360
+      fps: 5
+
+  koekken:
+    ui:
+      order: 7
+      dashboard: true
+    ffmpeg:
+      inputs:
+        - path: rtsp://127.0.0.1:8554/koekken
+          input_args: preset-rtsp-restream
+          roles:
+            - record
+        - path: rtsp://127.0.0.1:8554/koekken_sub
+          input_args: preset-rtsp-restream
+          roles:
+            - detect
+    detect:
+      enabled: true
+      width: 640
+      height: 360
+      fps: 5
+    motion:
+      mask:
+        mask1:
+          coordinates: "0.000,1.000,0.239,1.000,0.270,0.000,0.000,0.000"
+    objects:
+      filters:
+        person:
+          mask:
+            person_mask1:
+              coordinates: "0.000,1.000,0.239,1.000,0.270,0.000,0.000,0.000"
