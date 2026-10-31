@@ -33,5 +33,14 @@ services:
       TZ: Europe/Copenhagen
       FRIGATE_RTSP_PASSWORD: ${FRIGATE_RTSP_PASSWORD}
       FRIGATE_MQTT_PASSWORD: ${FRIGATE_MQTT_PASSWORD}
+    networks:
+      - camera-events-v2-test_ce-v2-test
+      - camera-events-v2_ce-v2-network
     labels:
       - "traefik.enable=false"
+
+networks:
+  camera-events-v2-test_ce-v2-test:
+    external: true
+  camera-events-v2_ce-v2-network:
+    external: true
