@@ -1,6 +1,8 @@
 # Traefik access log
 filenames:
   - /var/log/traefik/access.log
+# Watch the directory so the log is picked up even if Traefik creates it after CrowdSec starts.
+force_inotify: true
 labels:
   type: traefik
 ---

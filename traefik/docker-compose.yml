@@ -70,6 +70,27 @@ services:
     networks:
       - crowdsec
 
+  # Traefik can't rotate its access log. Every 5 min, if it exceeds 50 MB, keep one copy and truncate
+  # in place (Traefik appends, CrowdSec follows the truncation), so the logs use at most ~100 MB.
+  log-rotate:
+    image: alpine:3.20
+    container_name: traefik-log-rotate
+    restart: unless-stopped
+    network_mode: none
+    command:
+      - sh
+      - -c
+      - |
+        f=/var/log/traefik/access.log
+        while true; do
+          if [ -f "$$f" ] && [ "$$(stat -c %s "$$f")" -gt 52428800 ]; then
+            cp "$$f" "$$f.1" && : > "$$f"
+          fi
+          sleep 300
+        done
+    volumes:
+      - traefik-logs:/var/log/traefik
+
 volumes:
   traefik-logs:
   crowdsec-db:

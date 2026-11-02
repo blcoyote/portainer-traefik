@@ -8,7 +8,7 @@ log:
   level: INFO
 
 # Access log is read by CrowdSec (shared traefik-logs volume).
-# Traefik doesn't rotate it: send SIGUSR1 to Traefik after rotating (e.g. logrotate postrotate: docker kill -s USR1 traefik).
+# Traefik doesn't rotate it; the log-rotate service in docker-compose.yml caps it.
 accessLog:
   filePath: /var/log/traefik/access.log
   format: json
