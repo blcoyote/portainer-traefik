@@ -45,7 +45,7 @@ certificatesResolvers:
   letsencrypt:
     acme:
       # email is set via TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_EMAIL env var
-      storage: /etc/traefik/acme.json
+      storage: /etc/traefik/acme/acme.json # traefik-acme volume
       # http-01 runs on the "web" entrypoint, which is deliberately NOT geoblocked:
       # Let's Encrypt validates from locations outside the EU.
       httpChallenge:

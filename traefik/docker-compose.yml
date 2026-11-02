@@ -15,11 +15,13 @@ services:
       # Dashboard is plain HTTP + basic auth: never expose it publicly. Set TRAEFIK_DASHBOARD_BIND
       # to the host's LAN IP to reach it from the LAN; default is localhost only.
       - "${TRAEFIK_DASHBOARD_BIND:-127.0.0.1}:18080:8080"
-    entrypoint: ["/bin/sh", "-c", "chmod 600 /etc/traefik/acme.json && exec traefik"]
+    # Certificates live in the traefik-acme volume so they survive redeploys (Portainer re-checks out the
+    # repo on each redeploy, which used to reset acme.json and re-request every certificate).
+    entrypoint: ["/bin/sh", "-c", "touch /etc/traefik/acme/acme.json && chmod 600 /etc/traefik/acme/acme.json && exec traefik"]
     volumes:
       - ./traefik.yml:/etc/traefik/traefik.yml:ro
       - ./dynamic.yml:/etc/traefik/dynamic.yml:ro
-      - ./acme.json:/etc/traefik/acme.json
+      - traefik-acme:/etc/traefik/acme
       - traefik-logs:/var/log/traefik
     environment:
       - TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_EMAIL=${ACME_EMAIL}
@@ -92,6 +94,7 @@ services:
       - traefik-logs:/var/log/traefik
 
 volumes:
+  traefik-acme:
   traefik-logs:
   crowdsec-db:
   crowdsec-config:
