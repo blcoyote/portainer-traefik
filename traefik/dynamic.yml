@@ -1,3 +1,4 @@
+# This file is rendered as a Go template by Traefik, so {{ env "..." }} reads the container's environment.
 http:
   # Redirect all HTTP to HTTPS (allows ACME http-01 challenge to run first
   # because acme-http@internal has higher router priority)
@@ -17,6 +18,88 @@ http:
         scheme: https
         permanent: true
 
+    # Allow only EU member states. LAN (RFC1918) and Tailscale (100.64.0.0/10) always pass.
+    # Country lookups go to geojs.io and are cached; if the lookup fails the request is blocked.
+    geoblock:
+      plugin:
+        geoblock:
+          api: "https://get.geojs.io/v1/ip/country/{ip}"
+          apiTimeoutMs: 750
+          cacheSize: 500
+          allowLocalRequests: true
+          allowUnknownCountries: false
+          unknownCountryApiResponse: "nil"
+          blacklist: false
+          addCountryHeader: false
+          logAllowedRequests: false
+          allowedIPAddresses:
+            - 100.64.0.0/10
+          countries:
+            - AT # Austria
+            - BE # Belgium
+            - BG # Bulgaria
+            - HR # Croatia
+            - CY # Cyprus
+            - CZ # Czechia
+            - DK # Denmark
+            - EE # Estonia
+            - FI # Finland
+            - FR # France
+            - DE # Germany
+            - GR # Greece
+            - HU # Hungary
+            - IE # Ireland
+            - IT # Italy
+            - LV # Latvia
+            - LT # Lithuania
+            - LU # Luxembourg
+            - MT # Malta
+            - NL # Netherlands
+            - PL # Poland
+            - PT # Portugal
+            - RO # Romania
+            - SK # Slovakia
+            - SI # Slovenia
+            - ES # Spain
+            - SE # Sweden
+
+    # Blocks IPs CrowdSec has banned (local detections + community blocklist) and runs AppSec (WAF) rules.
+    crowdsec:
+      plugin:
+        crowdsec:
+          enabled: true
+          crowdsecMode: stream
+          updateIntervalSeconds: 60
+          crowdsecLapiScheme: http
+          crowdsecLapiHost: crowdsec:8080
+          crowdsecLapiKey: '{{ env "CROWDSEC_BOUNCER_KEY" }}'
+          crowdsecAppsecEnabled: true
+          crowdsecAppsecHost: crowdsec:7422
+          # Don't take every site down if the AppSec engine errors or is restarting.
+          crowdsecAppsecFailureBlock: false
+          crowdsecAppsecUnreachableBlock: false
+          clientTrustedIPs:
+            - 10.0.0.0/8
+            - 172.16.0.0/12
+            - 192.168.0.0/16
+            - 100.64.0.0/10
+
+    secure-headers:
+      headers:
+        stsSeconds: 31536000
+        contentTypeNosniff: true
+        customFrameOptionsValue: SAMEORIGIN
+        referrerPolicy: same-origin
+        customResponseHeaders:
+          X-Powered-By: ""
+          Server: ""
+
   serversTransports:
     portainer-transport:
       insecureSkipVerify: true
+
+tls:
+  options:
+    default:
+      minVersion: VersionTLS12
+      sniStrict: true

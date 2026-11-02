@@ -7,6 +7,13 @@ api:
 log:
   level: INFO
 
+# Access log is read by CrowdSec (shared traefik-logs volume).
+# Traefik doesn't rotate it: send SIGUSR1 to Traefik after rotating (e.g. logrotate postrotate: docker kill -s USR1 traefik).
+accessLog:
+  filePath: /var/log/traefik/access.log
+  format: json
+  bufferingSize: 100
+
 entryPoints:
   dashboard:
     address: ":8080"
@@ -19,12 +26,28 @@ entryPoints:
     http:
       tls:
         certResolver: letsencrypt
+      # Applied to every router on this entrypoint, in order: cheap country check first, then CrowdSec.
+      middlewares:
+        - geoblock@file
+        - crowdsec@file
+        - secure-headers@file
+
+experimental:
+  plugins:
+    geoblock:
+      moduleName: github.com/PascalMinder/geoblock
+      version: v0.3.8
+    crowdsec:
+      moduleName: github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+      version: v1.8.1
 
 certificatesResolvers:
   letsencrypt:
     acme:
       # email is set via TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_EMAIL env var
       storage: /etc/traefik/acme.json
+      # http-01 runs on the "web" entrypoint, which is deliberately NOT geoblocked:
+      # Let's Encrypt validates from locations outside the EU.
       httpChallenge:
         entryPoint: web
       # Uncomment the line below to use Let's Encrypt staging server during testing.
@@ -33,7 +56,8 @@ certificatesResolvers:
 
 providers:
   docker:
-    endpoint: unix:///var/run/docker.sock
+    # Docker API via the read-only socket proxy, not the raw socket.
+    endpoint: tcp://socket-proxy:2375
     exposedByDefault: false
     network: proxy
   file:
