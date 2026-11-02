@@ -3,20 +3,31 @@ services:
     image: traefik:v3
     container_name: traefik
     restart: unless-stopped
+    depends_on:
+      - socket-proxy
+      - crowdsec
+    # NOTE: CrowdSec and geoblocking need the real client IP. If the access log shows every client
+    # as a 172.x Docker address (Docker running without iptables / userland-proxy), switch Traefik
+    # to network_mode: host.
     ports:
       - "10080:80"
       - "10443:443"
-      - "18080:8080"
+      # Dashboard is plain HTTP + basic auth: never expose it publicly. Set TRAEFIK_DASHBOARD_BIND
+      # to the host's LAN IP to reach it from the LAN; default is localhost only.
+      - "${TRAEFIK_DASHBOARD_BIND:-127.0.0.1}:18080:8080"
     entrypoint: ["/bin/sh", "-c", "chmod 600 /etc/traefik/acme.json && exec traefik"]
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./traefik.yml:/etc/traefik/traefik.yml:ro
       - ./dynamic.yml:/etc/traefik/dynamic.yml:ro
       - ./acme.json:/etc/traefik/acme.json
+      - traefik-logs:/var/log/traefik
     environment:
       - TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_EMAIL=${ACME_EMAIL}
+      - CROWDSEC_BOUNCER_KEY=${CROWDSEC_BOUNCER_KEY:?set CROWDSEC_BOUNCER_KEY}
     networks:
       - proxy
+      - socket-proxy
+      - crowdsec
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.dashboard.rule=PathPrefix(`/`)"
@@ -25,6 +36,69 @@ services:
       - "traefik.http.routers.dashboard.middlewares=dashboard-auth"
       - "traefik.http.middlewares.dashboard-auth.basicauth.users=${TRAEFIK_DASHBOARD_USER}:${TRAEFIK_DASHBOARD_PASSWORD_HASH}"
 
+  # Read-only Docker API for Traefik's docker provider; Traefik no longer mounts the socket.
+  socket-proxy:
+    image: tecnativa/docker-socket-proxy:latest
+    container_name: traefik-socket-proxy
+    restart: unless-stopped
+    environment:
+      CONTAINERS: 1
+      NETWORKS: 1
+      EVENTS: 1
+      VERSION: 1
+      PING: 1
+      POST: 0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - socket-proxy
+
+  crowdsec:
+    image: crowdsecurity/crowdsec:latest
+    container_name: crowdsec
+    restart: unless-stopped
+    environment:
+      COLLECTIONS: "crowdsecurity/traefik crowdsecurity/http-cve crowdsecurity/appsec-virtual-patching crowdsecurity/appsec-generic-rules"
+      # Registers the Traefik bouncer with this key on startup.
+      BOUNCER_KEY_TRAEFIK: ${CROWDSEC_BOUNCER_KEY:?set CROWDSEC_BOUNCER_KEY}
+      TZ: Europe/Copenhagen
+    volumes:
+      - ./crowdsec/acquis.yaml:/etc/crowdsec/acquis.yaml:ro
+      - traefik-logs:/var/log/traefik:ro
+      - crowdsec-db:/var/lib/crowdsec/data
+      - crowdsec-config:/etc/crowdsec
+    networks:
+      - crowdsec
+
+  # Traefik can't rotate its access log. Every 5 min, if it exceeds 50 MB, keep one copy and truncate
+  # in place (Traefik appends, CrowdSec follows the truncation), so the logs use at most ~100 MB.
+  log-rotate:
+    image: alpine:3.20
+    container_name: traefik-log-rotate
+    restart: unless-stopped
+    network_mode: none
+    command:
+      - sh
+      - -c
+      - |
+        f=/var/log/traefik/access.log
+        while true; do
+          if [ -f "$$f" ] && [ "$$(stat -c %s "$$f")" -gt 52428800 ]; then
+            cp "$$f" "$$f.1" && : > "$$f"
+          fi
+          sleep 300
+        done
+    volumes:
+      - traefik-logs:/var/log/traefik
+
+volumes:
+  traefik-logs:
+  crowdsec-db:
+  crowdsec-config:
+
 networks:
   proxy:
     external: true
+  socket-proxy:
+    internal: true
+  crowdsec:

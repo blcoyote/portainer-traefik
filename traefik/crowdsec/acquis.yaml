@@ -1,0 +1,15 @@
+# Traefik access log
+filenames:
+  - /var/log/traefik/access.log
+# Watch the directory so the log is picked up even if Traefik creates it after CrowdSec starts.
+force_inotify: true
+labels:
+  type: traefik
+---
+# AppSec (WAF) endpoint the Traefik bouncer forwards requests to
+source: appsec
+name: traefik-appsec
+listen_addr: 0.0.0.0:7422
+appsec_config: crowdsecurity/appsec-default
+labels:
+  type: appsec
