@@ -37,6 +37,9 @@ http:
             # GitHub webhook sources: the "hooks" list from https://api.github.com/meta.
             # Checked monthly by .github/workflows/github-hook-ranges.yml; keep the markers.
             # BEGIN github-hooks
+            - 9.234.106.48/28
+            - 9.234.98.160/28
+            - 9.234.98.176/28
             - 192.30.252.0/22
             - 185.199.108.0/22
             - 140.82.112.0/20
