@@ -18,7 +18,7 @@ http:
         scheme: https
         permanent: true
 
-    # Allow only EU member states. LAN (RFC1918) and Tailscale (100.64.0.0/10) always pass.
+    # Allow EU member states + US (GitHub webhooks). LAN (RFC1918) and Tailscale (100.64.0.0/10) always pass.
     # Country lookups go to geojs.io and are cached; if the lookup fails the request is blocked.
     geoblock:
       plugin:
@@ -62,6 +62,7 @@ http:
             - SI # Slovenia
             - ES # Spain
             - SE # Sweden
+            - US # United States (GitHub webhooks)
 
     # Blocks IPs CrowdSec has banned (local detections + community blocklist) and runs AppSec (WAF) rules.
     crowdsec:
