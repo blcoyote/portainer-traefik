@@ -1,0 +1,47 @@
+# Monthly check that the GitHub webhook ranges allowed through the geoblock (traefik/dynamic.yml)
+# still match https://api.github.com/meta. If they changed, opens (or updates) a PR with the new list.
+# Requires: Settings > Actions > General > "Allow GitHub Actions to create and approve pull requests".
+name: GitHub webhook IP ranges
+
+on:
+  schedule:
+    - cron: "17 6 1 * *" # 06:17 UTC on the 1st of each month
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: github-hook-ranges
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sync ranges with api.github.com/meta
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/scripts/update_github_hooks.py
+
+      - name: Open PR if the ranges changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet; then
+            echo "No changes."
+            exit 0
+          fi
+          branch=bot/github-hook-ranges
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$branch"
+          git commit -am "Update GitHub webhook IP ranges in geoblock allow list"
+          git push --force origin "$branch"
+          if [ -z "$(gh pr list --head "$branch" --state open --json number --jq '.[].number')" ]; then
+            gh pr create --head "$branch" --base "${{ github.event.repository.default_branch }}" \
+              --title "Update GitHub webhook IP ranges" \
+              --body "GitHub's published webhook ranges (https://api.github.com/meta, \`hooks\`) changed. This updates the geoblock allow list in \`traefik/dynamic.yml\`. Merge and redeploy the Traefik stack so webhooks keep getting through."
+          fi
