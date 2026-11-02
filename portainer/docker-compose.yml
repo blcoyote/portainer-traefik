@@ -4,20 +4,14 @@ services:
     container_name: portainer
     restart: unless-stopped
     #command: --admin-password=${PORTAINER_ADMIN_PASSWORD_HASH}
-    # Direct access bypasses Traefik (no geoblock/CrowdSec). Kept as a LAN fallback in case Traefik
-    # is down, since Portainer manages the Traefik stack. Do NOT port-forward 9443 on the router.
     ports:
       - 9443:9443
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - portainer_data:/data
 
-    networks:
-      - default
-      - proxy
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=proxy"
       - "traefik.http.routers.portainer.rule=Host(`${PORTAINER_HOSTNAME}`)"
       - "traefik.http.routers.portainer.entrypoints=websecure"
       - "traefik.http.services.portainer.loadbalancer.server.port=9443"
@@ -31,6 +25,4 @@ volumes:
 networks:
   default:
     name: portainer_network
-  proxy:
-    external: true
 
