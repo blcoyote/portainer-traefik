@@ -1,0 +1,38 @@
+# Self-hosted GitHub Actions runner. Lets workflows call Portainer stack webhooks over the internal
+# Docker network, so GitHub never needs to reach Portainer from the internet.
+#
+# Deploy in Portainer as a Git stack with compose path github-runner/docker-compose.yml and set the
+# variables from .env.example in the stack's environment. The portainer stack must be running first
+# (it creates portainer_network).
+services:
+  github-runner:
+    image: myoung34/github-runner:latest
+    container_name: github-runner
+    restart: unless-stopped
+    environment:
+      RUNNER_SCOPE: repo
+      REPO_URL: ${RUNNER_REPO_URL:?set RUNNER_REPO_URL}
+      # PAT used to fetch a fresh registration token on start (registration tokens expire after 1h).
+      ACCESS_TOKEN: ${RUNNER_ACCESS_TOKEN:?set RUNNER_ACCESS_TOKEN}
+      RUNNER_NAME: ${RUNNER_NAME:-portainer-runner}
+      LABELS: ${RUNNER_LABELS:-portainer}
+      RUNNER_WORKDIR: /tmp/runner/work
+      # Keep the registration in a volume so restarts/redeploys reuse it instead of piling up
+      # duplicate runners in GitHub.
+      CONFIGURED_ACTIONS_RUNNER_FILES_DIR: /runner/data
+      DISABLE_AUTOMATIC_DEREGISTRATION: "true"
+      TZ: ${TZ:-Europe/Copenhagen}
+    volumes:
+      - github-runner-data:/runner/data
+    # No Docker socket: jobs only need to curl Portainer, not run containers on the host.
+    networks:
+      - portainer_network
+    labels:
+      - "traefik.enable=false"
+
+volumes:
+  github-runner-data:
+
+networks:
+  portainer_network:
+    external: true

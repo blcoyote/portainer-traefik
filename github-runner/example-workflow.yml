@@ -1,0 +1,27 @@
+# Copy to .github/workflows/portainer-redeploy.yml in the repository the runner is registered to.
+#
+# Repository secret PORTAINER_WEBHOOKS: one Portainer webhook URL per line, using the internal host
+# name, e.g. https://portainer:9443/api/stacks/webhooks/<uuid>
+# (Portainer shows the webhook under the stack's GitOps settings; swap its host for portainer:9443.)
+name: Redeploy Portainer stacks
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  redeploy:
+    runs-on: [self-hosted, portainer]
+    steps:
+      - name: Call Portainer webhooks
+        env:
+          PORTAINER_WEBHOOKS: ${{ secrets.PORTAINER_WEBHOOKS }}
+        run: |
+          set -eu
+          printf '%s\n' "$PORTAINER_WEBHOOKS" | while IFS= read -r url; do
+            [ -z "$url" ] && continue
+            echo "Triggering ${url%/*}/***"
+            # -k: Portainer's 9443 listener uses its self-signed certificate on the internal network.
+            curl -fsS -k -X POST "$url"
+          done
