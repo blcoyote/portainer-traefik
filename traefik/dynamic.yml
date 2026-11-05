@@ -86,9 +86,15 @@ http:
             - 192.168.0.0/16
             - 100.64.0.0/10
 
+    # Applied to every router on websecure (traefik.yml). Entrypoint middleware wraps the
+    # router's own middleware, so these values override any same header a router sets.
     secure-headers:
       headers:
         stsSeconds: 31536000
+        # On a subdomain host (e.g. ce2.elcoyote.dk) this only covers hosts below it.
+        # No stsPreload: the preload list only takes the registrable domain (elcoyote.dk),
+        # which would force HTTPS on every *.elcoyote.dk host and is slow to undo.
+        stsIncludeSubdomains: true
         contentTypeNosniff: true
         customFrameOptionsValue: SAMEORIGIN
         referrerPolicy: same-origin
