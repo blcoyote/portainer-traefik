@@ -24,19 +24,20 @@ groups:
             datasourceUid: victoriametrics
             relativeTimeRange: { from: 300, to: 0 }
             model:
-              expr: up == 0
+              expr: up   # 1 = up, 0 = down; C fires below 1
+              instant: true
           - refId: C
             datasourceUid: __expr__
             model:
               type: threshold
               expression: A
               conditions:
-                - evaluator: { type: gt, params: [0] }
+                - evaluator: { type: lt, params: [1] }
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "{{ $$labels.job }} is down"   # $$ = literal $ (provisioning files expand $VARS)
+          summary: "{{ $labels.job }} is down"
 ```
 
 All alerts route to the `telegram` contact point (see `contact-points.yml`).

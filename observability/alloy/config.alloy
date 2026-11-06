@@ -9,9 +9,23 @@
 // ---------------------------------------------------------------------------
 // Docker discovery (via the read-only socket proxy)
 // ---------------------------------------------------------------------------
+// One target per container (its first network): used for log tailing, so each container is tailed once.
 discovery.docker "containers" {
   host             = "tcp://socket-proxy:2375"
   refresh_interval = "15s"
+}
+
+// One target per container *per network*, limited to opted-in containers, so a container on
+// e.g. app_default + observability can still be scraped via its observability address.
+discovery.docker "scrape_candidates" {
+  host                = "tcp://socket-proxy:2375"
+  refresh_interval    = "15s"
+  match_first_network = false
+
+  filter {
+    name   = "label"
+    values = ["metrics.scrape=true"]
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -69,7 +83,7 @@ loki.write "victorialogs" {
 //    The container must be attached to the `observability` network.
 // ---------------------------------------------------------------------------
 discovery.relabel "scrape" {
-  targets = discovery.docker.containers.targets
+  targets = discovery.docker.scrape_candidates.targets
 
   rule {
     source_labels = ["__meta_docker_container_label_metrics_scrape"]
