@@ -1,0 +1,191 @@
+// Grafana Alloy: the single collection point of the observability stack.
+//
+// Inputs:
+//   1. stdout/stderr of every container on the host          -> VictoriaLogs
+//   2. /metrics of containers labelled metrics.scrape=true  -> VictoriaMetrics
+//   3. OTLP on :4317 (gRPC) / :4318 (HTTP), metrics + logs   -> VictoriaMetrics / VictoriaLogs
+// Alloy's own metrics are scraped too, so the pipeline itself can be alerted on.
+
+// ---------------------------------------------------------------------------
+// Docker discovery (via the read-only socket proxy)
+// ---------------------------------------------------------------------------
+// One target per container (its first network): used for log tailing, so each container is tailed once.
+discovery.docker "containers" {
+  host             = "tcp://socket-proxy:2375"
+  refresh_interval = "15s"
+}
+
+// One target per container *per network*, limited to opted-in containers, so a container on
+// e.g. app_default + observability can still be scraped via its observability address.
+discovery.docker "scrape_candidates" {
+  host                = "tcp://socket-proxy:2375"
+  refresh_interval    = "15s"
+  match_first_network = false
+
+  filter {
+    name   = "label"
+    values = ["metrics.scrape=true"]
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 1. Container logs
+// ---------------------------------------------------------------------------
+discovery.relabel "logs" {
+  targets = discovery.docker.containers.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    target_label  = "compose_project"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "compose_service"
+  }
+  // Opt out of log collection with the label logs.collect=false.
+  rule {
+    source_labels = ["__meta_docker_container_label_logs_collect"]
+    regex         = "false"
+    action        = "drop"
+  }
+}
+
+loki.source.docker "containers" {
+  host          = "tcp://socket-proxy:2375"
+  targets       = discovery.relabel.logs.output
+  relabel_rules = discovery.relabel.logs.rules
+  forward_to    = [loki.write.victorialogs.receiver]
+}
+
+loki.write "victorialogs" {
+  endpoint {
+    url     = "http://victorialogs:9428/insert/loki/api/v1/push"
+    headers = {
+      "VL-Stream-Fields" = "container,compose_project,compose_service",
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 2. Label-based metric scraping
+//
+//    labels:
+//      metrics.scrape: "true"
+//      metrics.port: "8080"       # required
+//      metrics.path: "/metrics"   # optional, default /metrics
+//      metrics.job: "my-app"      # optional, default compose service / container name
+//
+//    The container must be attached to the `observability` network.
+// ---------------------------------------------------------------------------
+discovery.relabel "scrape" {
+  targets = discovery.docker.scrape_candidates.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_label_metrics_scrape"]
+    regex         = "true"
+    action        = "keep"
+  }
+  rule {
+    source_labels = ["__meta_docker_network_name"]
+    regex         = "observability"
+    action        = "keep"
+  }
+  rule {
+    source_labels = ["__meta_docker_network_ip", "__meta_docker_container_label_metrics_port"]
+    regex         = "(.+);(.+)"
+    replacement   = "$1:$2"
+    target_label  = "__address__"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_label_metrics_path"]
+    regex         = "(.+)"
+    target_label  = "__metrics_path__"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    target_label  = "compose_project"
+  }
+  // job = metrics.job label, else compose service name, else container name.
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "job"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    regex         = "(.+)"
+    target_label  = "job"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_label_metrics_job"]
+    regex         = "(.+)"
+    target_label  = "job"
+  }
+}
+
+prometheus.scrape "containers" {
+  targets         = discovery.relabel.scrape.output
+  scrape_interval = "30s"
+  forward_to      = [prometheus.remote_write.victoriametrics.receiver]
+}
+
+// Alloy's own health metrics.
+prometheus.exporter.self "alloy" {}
+
+prometheus.scrape "alloy" {
+  targets         = prometheus.exporter.self.alloy.targets
+  scrape_interval = "60s"
+  forward_to      = [prometheus.remote_write.victoriametrics.receiver]
+}
+
+prometheus.remote_write "victoriametrics" {
+  endpoint {
+    url = "http://victoriametrics:8428/api/v1/write"
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 3. OTLP receiver (metrics + logs; no traces backend)
+// ---------------------------------------------------------------------------
+otelcol.receiver.otlp "default" {
+  grpc {
+    endpoint = "0.0.0.0:4317"
+  }
+  http {
+    endpoint = "0.0.0.0:4318"
+  }
+  output {
+    metrics = [otelcol.processor.batch.default.input]
+    logs    = [otelcol.processor.batch.default.input]
+  }
+}
+
+otelcol.processor.batch "default" {
+  output {
+    metrics = [otelcol.exporter.prometheus.victoriametrics.input]
+    logs    = [otelcol.exporter.otlphttp.victorialogs.input]
+  }
+}
+
+otelcol.exporter.prometheus "victoriametrics" {
+  forward_to = [prometheus.remote_write.victoriametrics.receiver]
+}
+
+otelcol.exporter.otlphttp "victorialogs" {
+  client {
+    endpoint = "http://victorialogs:9428/insert/opentelemetry"
+    tls {
+      insecure = true
+    }
+  }
+}

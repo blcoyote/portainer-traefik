@@ -1,0 +1,115 @@
+# Observability stack: Grafana + VictoriaMetrics + VictoriaLogs + Grafana Alloy.
+#
+# First deploy:
+#   1. docker network create observability   (external, like `proxy`, so other stacks can join it)
+#   2. Set the variables from .env.example as Portainer stack env vars.
+#
+# Grafana is the only UI and is NOT routed through Traefik: it binds to GRAFANA_BIND (LAN or Tailscale IP).
+# The storage backends publish no ports; they are only reachable on the observability network.
+# See README.md for how a service plugs in (OTLP push, or labels for scraping).
+services:
+  grafana:
+    image: grafana/grafana:13.2
+    container_name: grafana
+    restart: unless-stopped
+    depends_on:
+      - victoriametrics
+      - victorialogs
+    ports:
+      - "${GRAFANA_BIND:-127.0.0.1}:3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD}
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3000}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      # Installed before startup so the provisioned VictoriaLogs datasource resolves.
+      GF_PLUGINS_PREINSTALL_SYNC: victoriametrics-logs-datasource
+      # Read by provisioning/alerting/contact-points.yml.
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?set TELEGRAM_BOT_TOKEN}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:?set TELEGRAM_CHAT_ID}
+      TZ: Europe/Copenhagen
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    networks:
+      - observability
+
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:v1.154.1
+    container_name: victoriametrics
+    restart: unless-stopped
+    command:
+      - -storageDataPath=/storage
+      - -retentionPeriod=${METRICS_RETENTION:-90d}
+      - -httpListenAddr=:8428
+    volumes:
+      - victoriametrics-data:/storage
+    networks:
+      - observability
+
+  victorialogs:
+    image: victoriametrics/victoria-logs:v1.53.0
+    container_name: victorialogs
+    restart: unless-stopped
+    command:
+      - -storageDataPath=/vlogs
+      - -retentionPeriod=${LOGS_RETENTION:-30d}
+      - -httpListenAddr=:9428
+    volumes:
+      - victorialogs-data:/vlogs
+    networks:
+      - observability
+
+  # Collector: container logs, label-based metric scraping, and OTLP (gRPC 4317 / HTTP 4318) for metrics + logs.
+  alloy:
+    image: grafana/alloy:v1.21.3
+    container_name: alloy
+    restart: unless-stopped
+    depends_on:
+      - socket-proxy
+      - victoriametrics
+      - victorialogs
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    volumes:
+      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - alloy-data:/var/lib/alloy/data
+    networks:
+      - observability
+      - obs-socket-proxy
+
+  # Read-only Docker API for Alloy's discovery and log tailing. Separate from Traefik's socket proxy on purpose.
+  socket-proxy:
+    image: tecnativa/docker-socket-proxy:v0.4.2
+    container_name: observability-socket-proxy
+    restart: unless-stopped
+    environment:
+      CONTAINERS: 1
+      NETWORKS: 1
+      EVENTS: 1
+      VERSION: 1
+      PING: 1
+      INFO: 1
+      POST: 0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - obs-socket-proxy
+
+volumes:
+  grafana-data:
+  victoriametrics-data:
+  victorialogs-data:
+  alloy-data:
+
+networks:
+  observability:
+    external: true
+  obs-socket-proxy:
+    internal: true
