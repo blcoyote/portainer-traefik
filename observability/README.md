@@ -1,6 +1,6 @@
 # Observability stack
 
-Grafana for dashboards and alerting, VictoriaMetrics for metrics (90 days), VictoriaLogs for logs (30 days),
+Grafana for dashboards, VictoriaMetrics for metrics (90 days), VictoriaLogs for logs (30 days),
 and Grafana Alloy as the single collector. Everything is provisioned from this directory.
 
 ```
@@ -11,12 +11,12 @@ and Grafana Alloy as the single collector. Everything is provisioned from this d
                                             alloy ──► victoriametrics ─┐
                                                   └─► victorialogs ────┤
                                                                        ▼
-                         GRAFANA_BIND:3000 ◄──────────────────────── grafana ──► Telegram
+                         GRAFANA_BIND:3000 ◄──────────────────────── grafana
 ```
 
 | Service | Purpose | Reachable at |
 |---|---|---|
-| `grafana` | Dashboards, alerting | `${GRAFANA_BIND}:3000` (LAN/Tailscale only, no Traefik route) |
+| `grafana` | Dashboards | `${GRAFANA_BIND}:3000` (LAN/Tailscale only, no Traefik route) |
 | `victoriametrics` | Metrics store (Prometheus-compatible) | `victoriametrics:8428` on `observability` |
 | `victorialogs` | Log store | `victorialogs:9428` on `observability` |
 | `alloy` | Collector | `alloy:4317` (OTLP gRPC), `alloy:4318` (OTLP HTTP) on `observability` |
@@ -26,8 +26,8 @@ and Grafana Alloy as the single collector. Everything is provisioned from this d
 
 1. On the host: `docker network create observability`
 2. In Portainer, create a stack from this repo with compose path `observability/docker-compose.yml`
-   and set the variables from [`.env.example`](.env.example). `GRAFANA_ADMIN_PASSWORD`,
-   `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are required; the stack refuses to start without them.
+   and set the variables from [`.env.example`](.env.example). `GRAFANA_ADMIN_PASSWORD` is required;
+   the stack refuses to start without it.
 3. Set `GRAFANA_BIND` to the host's LAN or Tailscale IP, then open `http://<that IP>:3000`.
 
 Grafana downloads the VictoriaLogs datasource plugin from grafana.com on first start, so the host
@@ -73,16 +73,16 @@ it is on the network. Opt out with the label `logs.collect: "false"`.
       OTEL_TRACES_EXPORTER: none   # no traces backend in this stack
 ```
 
-## Dashboards and alerts
+## Dashboards
 
 - **Dashboards:** JSON files in [`grafana/dashboards/`](grafana/dashboards/); subfolders become folders.
-- **Alert rules:** YAML files in [`grafana/provisioning/alerting/`](grafana/provisioning/alerting/).
-  Every alert goes to the Telegram contact point. No rules are defined yet.
 - **Datasource UIDs:** `victoriametrics` (Prometheus type, MetricsQL/PromQL) and `victorialogs` (LogsQL).
 
 Provisioned items are read-only in the UI. Make changes in Grafana, export them, and commit the file.
 
+Alerting is switched off for now (`GF_UNIFIED_ALERTING_ENABLED: "false"` in the compose file).
+
 ## Querying
 
 - Logs: `{container="grafana"} error`, or `compose_project:observability` in LogsQL.
-- Metrics: `up` lists every scrape target; `up == 0` is a good first alert.
+- Metrics: `up` lists every scrape target (1 = up, 0 = down).

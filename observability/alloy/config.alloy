@@ -4,7 +4,7 @@
 //   1. stdout/stderr of every container on the host          -> VictoriaLogs
 //   2. /metrics of containers labelled metrics.scrape=true  -> VictoriaMetrics
 //   3. OTLP on :4317 (gRPC) / :4318 (HTTP), metrics + logs   -> VictoriaMetrics / VictoriaLogs
-// Alloy's own metrics are scraped too, so the pipeline itself can be alerted on.
+// Alloy's own metrics are scraped too, so the pipeline itself can be monitored.
 
 // ---------------------------------------------------------------------------
 // Docker discovery (via the read-only socket proxy)

@@ -26,9 +26,9 @@ services:
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
       # Installed before startup so the provisioned VictoriaLogs datasource resolves.
       GF_PLUGINS_PREINSTALL_SYNC: victoriametrics-logs-datasource
-      # Read by provisioning/alerting/contact-points.yml.
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?set TELEGRAM_BOT_TOKEN}
-      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:?set TELEGRAM_CHAT_ID}
+      # Alerting is off for now. To bring it back, set this to "true" and add a contact point
+      # and rules under grafana/provisioning/alerting/.
+      GF_UNIFIED_ALERTING_ENABLED: "false"
       TZ: Europe/Copenhagen
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
