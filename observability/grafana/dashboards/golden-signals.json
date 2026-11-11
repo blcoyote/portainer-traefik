@@ -519,7 +519,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "histogram_quantile(0.95, sum by (instance, le, http_response_status_class) (rate(http_server_request_duration_seconds_bucket{job=\"$job\", instance=~\"$instance\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (instance, le, http_response_status_class) (rate(http_server_request_duration_seconds_bucket{job=\"$job\", instance=~\"$instance\", http_response_status_class=~\".+\"}[$__rate_interval]) or label_replace(rate(http_server_request_duration_seconds_bucket{job=\"$job\", instance=~\"$instance\", http_response_status_code=~\".+\"}[$__rate_interval]), \"http_response_status_class\", \"${1}xx\", \"http_response_status_code\", \"([1-5])..\")))",
           "refId": "A",
           "legendFormat": "{{instance}} {{http_response_status_class}}"
         }
@@ -916,7 +916,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "sum by (instance, http_response_status_class) (rate(http_server_request_duration_seconds_count{job=\"$job\", instance=~\"$instance\", http_response_status_class=~\"4xx|5xx\"}[$__rate_interval]))",
+          "expr": "sum by (instance, http_response_status_class) (rate(http_server_request_duration_seconds_count{job=\"$job\", instance=~\"$instance\", http_response_status_class=~\"4xx|5xx\"}[$__rate_interval]) or label_replace(rate(http_server_request_duration_seconds_count{job=\"$job\", instance=~\"$instance\", http_response_status_code=~\"[45]..\"}[$__rate_interval]), \"http_response_status_class\", \"${1}xx\", \"http_response_status_code\", \"([1-5])..\"))",
           "refId": "A",
           "legendFormat": "{{instance}} {{http_response_status_class}}"
         }
