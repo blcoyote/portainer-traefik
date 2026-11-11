@@ -17,3 +17,28 @@ datasources:
     access: proxy
     url: http://victorialogs:9428
     editable: false
+    jsonData:
+      derivedFields:
+        # _msg is the raw JSON log line; link its trace_id to the VictoriaTraces datasource
+        - name: trace_id
+          matcherType: regex
+          matcherRegex: '"trace_id":"([0-9a-f]{32})"'
+          datasourceUid: victoriatraces
+          url: '$${__value.raw}'
+
+  - name: VictoriaTraces
+    uid: victoriatraces
+    type: jaeger
+    access: proxy
+    url: http://victoriatraces:10428/select/jaeger
+    editable: false
+    jsonData:
+      tracesToLogsV2:
+        datasourceUid: victorialogs
+        spanStartTimeShift: '-5m'
+        spanEndTimeShift: '5m'
+        filterByTraceID: false
+        filterBySpanID: false
+        customQuery: true
+        # $$ escapes Grafana's provisioning env-var expansion
+        query: '"$${__trace.traceId}"'
