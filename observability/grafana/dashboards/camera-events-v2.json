@@ -50,7 +50,16 @@
   "annotations": {
     "list": []
   },
-  "links": [],
+  "links": [
+    {
+      "title": "Logs",
+      "type": "link",
+      "url": "/d/camera-events-logs",
+      "keepTime": true,
+      "icon": "doc",
+      "targetBlank": false
+    }
+  ],
   "panels": [
     {
       "id": 1,
