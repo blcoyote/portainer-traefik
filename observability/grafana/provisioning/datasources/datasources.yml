@@ -19,10 +19,10 @@ datasources:
     editable: false
     jsonData:
       derivedFields:
-        # _msg is the raw JSON log line; link its trace_id to the VictoriaTraces datasource
+        # JSON log lines are stored as fields; link the trace_id field to the VictoriaTraces datasource
         - name: trace_id
-          matcherType: regex
-          matcherRegex: '"trace_id":"([0-9a-f]{32})"'
+          matcherType: label
+          matcherRegex: trace_id
           datasourceUid: victoriatraces
           url: '$${__value.raw}'
 
@@ -41,4 +41,4 @@ datasources:
         filterBySpanID: false
         customQuery: true
         # $$ escapes Grafana's provisioning env-var expansion
-        query: '"$${__trace.traceId}"'
+        query: 'trace_id:="$${__trace.traceId}"'

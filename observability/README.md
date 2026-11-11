@@ -88,11 +88,11 @@ Alerting is switched off for now (`GF_UNIFIED_ALERTING_ENABLED: "false"` in the 
 - Logs: `{container="grafana"} error`, or `compose_project:observability` in LogsQL.
 - Metrics: `up` lists every scrape target (1 = up, 0 = down).
 
-- Log to trace: app logs are JSON lines with `trace_id`. The VictoriaLogs datasource has a `trace_id` derived field
-  (regex on the raw line), so log lines in Explore show a link that opens the trace in VictoriaTraces.
-- Trace to logs: open a trace in the VictoriaTraces datasource and use the span's "Logs" button; it runs a
-  VictoriaLogs query for lines containing the trace id (span time +/- 5 minutes). Equivalent by hand:
-  `{compose_service="app"} | unpack_json | trace_id:="<id>"`.
+- JSON log lines: VictoriaLogs stores each top-level key as a field, and Alloy's `VL-Msg-Field: msg,_msg` header
+  makes `msg` the displayed message. Filter on fields directly, e.g. `{compose_service="app"} level:=error`.
+- Log to trace: the VictoriaLogs datasource turns the `trace_id` field into a link that opens the trace in VictoriaTraces.
+- Trace to logs: open a trace in the VictoriaTraces datasource and use the span's "Logs" button; it runs
+  `trace_id:="<id>"` in VictoriaLogs (span time +/- 5 minutes).
 
 ## Verifying traces
 

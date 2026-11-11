@@ -67,6 +67,8 @@ loki.write "victorialogs" {
     url     = "http://victorialogs:9428/insert/loki/api/v1/push"
     headers = {
       "VL-Stream-Fields" = "container,compose_project,compose_service",
+      // VictoriaLogs parses JSON lines into fields; show "msg" as the message (plain lines are unaffected).
+      "VL-Msg-Field"     = "msg,_msg",
     }
   }
 }
