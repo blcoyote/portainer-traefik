@@ -1,4 +1,4 @@
-# Observability stack: Grafana + VictoriaMetrics + VictoriaLogs + Grafana Alloy.
+# Observability stack: Grafana + VictoriaMetrics + VictoriaLogs + VictoriaTraces + Grafana Alloy.
 #
 # First deploy:
 #   1. docker network create observability   (external, like `proxy`, so other stacks can join it)
@@ -15,6 +15,7 @@ services:
     depends_on:
       - victoriametrics
       - victorialogs
+      - victoriatraces
     ports:
       - "${GRAFANA_BIND:-127.0.0.1}:3000:3000"
     environment:
@@ -63,7 +64,20 @@ services:
     networks:
       - observability
 
-  # Collector: container logs, label-based metric scraping, and OTLP (gRPC 4317 / HTTP 4318) for metrics + logs.
+  victoriatraces:
+    image: victoriametrics/victoria-traces:v0.13.0
+    container_name: victoriatraces
+    restart: unless-stopped
+    command:
+      - -storageDataPath=/vtraces
+      - -retentionPeriod=${TRACES_RETENTION:-30d}
+      - -httpListenAddr=:10428
+    volumes:
+      - victoriatraces-data:/vtraces
+    networks:
+      - observability
+
+  # Collector: container logs, label-based metric scraping, and OTLP (gRPC 4317 / HTTP 4318) for metrics, logs + traces.
   alloy:
     image: grafana/alloy:v1.21.3
     container_name: alloy
@@ -72,6 +86,7 @@ services:
       - socket-proxy
       - victoriametrics
       - victorialogs
+      - victoriatraces
     command:
       - run
       - --server.http.listen-addr=0.0.0.0:12345
@@ -106,6 +121,7 @@ volumes:
   grafana-data:
   victoriametrics-data:
   victorialogs-data:
+  victoriatraces-data:
   alloy-data:
 
 networks:
