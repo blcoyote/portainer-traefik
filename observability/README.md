@@ -1,7 +1,7 @@
 # Observability stack
 
 Grafana for dashboards, VictoriaMetrics for metrics (90 days), VictoriaLogs for logs (30 days),
-and Grafana Alloy as the single collector. Everything is provisioned from this directory.
+VictoriaTraces for traces (30 days), and Grafana Alloy as the single collector. Everything is provisioned from this directory.
 
 ```
  any container ── stdout/stderr ──────────────┐
@@ -9,7 +9,8 @@ and Grafana Alloy as the single collector. Everything is provisioned from this d
  instrumented app ── OTLP :4317 / :4318 ──────┤
                                               ▼
                                             alloy ──► victoriametrics ─┐
-                                                  └─► victorialogs ────┤
+                                                  ├─► victorialogs ────┤
+                                                  └─► victoriatraces ──┤
                                                                        ▼
                          GRAFANA_BIND:3000 ◄──────────────────────── grafana
 ```
@@ -19,6 +20,7 @@ and Grafana Alloy as the single collector. Everything is provisioned from this d
 | `grafana` | Dashboards | `${GRAFANA_BIND}:3000` (LAN/Tailscale only, no Traefik route) |
 | `victoriametrics` | Metrics store (Prometheus-compatible) | `victoriametrics:8428` on `observability` |
 | `victorialogs` | Log store | `victorialogs:9428` on `observability` |
+| `victoriatraces` | Trace store (OTLP ingest, Jaeger query API) | `victoriatraces:10428` on `observability` |
 | `alloy` | Collector | `alloy:4317` (OTLP gRPC), `alloy:4318` (OTLP HTTP) on `observability` |
 | `socket-proxy` | Read-only Docker API for Alloy | internal network only |
 
@@ -63,14 +65,13 @@ it is on the network. Opt out with the label `logs.collect: "false"`.
       metrics.job: "my-app"       # optional, default compose service name
 ```
 
-**Metrics and logs, pushed (OpenTelemetry).** Point the OTel SDK at Alloy:
+**Metrics, logs and traces, pushed (OpenTelemetry).** Point the OTel SDK at Alloy:
 
 ```yaml
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4318
       OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
       OTEL_SERVICE_NAME: my-app
-      OTEL_TRACES_EXPORTER: none   # no traces backend in this stack
 ```
 
 ## Dashboards
@@ -86,3 +87,36 @@ Alerting is switched off for now (`GF_UNIFIED_ALERTING_ENABLED: "false"` in the 
 
 - Logs: `{container="grafana"} error`, or `compose_project:observability` in LogsQL.
 - Metrics: `up` lists every scrape target (1 = up, 0 = down).
+
+## Verifying traces
+
+Post a minimal OTLP/JSON span to Alloy from a container on the network, then read it back from
+VictoriaTraces' Jaeger API (give it a few seconds to flush):
+
+```bash
+NOW=$(date +%s%N)
+docker run --rm --network observability curlimages/curl -sS -X POST http://alloy:4318/v1/traces \
+  -H 'Content-Type: application/json' -d '{
+  "resourceSpans": [{
+    "resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "smoke-test"}}]},
+    "scopeSpans": [{
+      "scope": {"name": "manual"},
+      "spans": [{
+        "traceId": "5b8efff798038103d269b633813fc60c",
+        "spanId": "eee19b7ec3c1b174",
+        "name": "hello",
+        "kind": 1,
+        "startTimeUnixNano": "'"$NOW"'",
+        "endTimeUnixNano": "'"$((NOW + 1000000000))"'"
+      }]
+    }]
+  }]
+}'
+
+docker run --rm --network observability curlimages/curl -sS http://victoriatraces:10428/select/jaeger/api/services
+docker run --rm --network observability curlimages/curl -sS \
+  http://victoriatraces:10428/select/jaeger/api/traces/5b8efff798038103d269b633813fc60c
+```
+
+`smoke-test` should appear in the services list. The span is stamped with the current time
+because VictoriaTraces rejects spans outside `TRACES_RETENTION`.

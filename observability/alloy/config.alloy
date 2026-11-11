@@ -3,7 +3,7 @@
 // Inputs:
 //   1. stdout/stderr of every container on the host          -> VictoriaLogs
 //   2. /metrics of containers labelled metrics.scrape=true  -> VictoriaMetrics
-//   3. OTLP on :4317 (gRPC) / :4318 (HTTP), metrics + logs   -> VictoriaMetrics / VictoriaLogs
+//   3. OTLP on :4317 (gRPC) / :4318 (HTTP), metrics / logs / traces -> VictoriaMetrics / VictoriaLogs / VictoriaTraces
 // Alloy's own metrics are scraped too, so the pipeline itself can be monitored.
 
 // ---------------------------------------------------------------------------
@@ -155,7 +155,7 @@ prometheus.remote_write "victoriametrics" {
 }
 
 // ---------------------------------------------------------------------------
-// 3. OTLP receiver (metrics + logs; no traces backend)
+// 3. OTLP receiver (metrics + logs + traces)
 // ---------------------------------------------------------------------------
 otelcol.receiver.otlp "default" {
   grpc {
@@ -167,6 +167,7 @@ otelcol.receiver.otlp "default" {
   output {
     metrics = [otelcol.processor.batch.default.input]
     logs    = [otelcol.processor.batch.default.input]
+    traces  = [otelcol.processor.batch.default.input]
   }
 }
 
@@ -174,6 +175,7 @@ otelcol.processor.batch "default" {
   output {
     metrics = [otelcol.exporter.prometheus.victoriametrics.input]
     logs    = [otelcol.exporter.otlphttp.victorialogs.input]
+    traces  = [otelcol.exporter.otlphttp.victoriatraces.input]
   }
 }
 
@@ -188,4 +190,15 @@ otelcol.exporter.otlphttp "victorialogs" {
       insecure = true
     }
   }
+}
+
+// Explicit traces_endpoint: VictoriaTraces ingests on /insert/opentelemetry/v1/traces.
+otelcol.exporter.otlphttp "victoriatraces" {
+  client {
+    endpoint = "http://victoriatraces:10428"
+    tls {
+      insecure = true
+    }
+  }
+  traces_endpoint = "http://victoriatraces:10428/insert/opentelemetry/v1/traces"
 }
