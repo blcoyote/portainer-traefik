@@ -42,3 +42,20 @@ datasources:
         customQuery: true
         # $$ escapes Grafana's provisioning env-var expansion
         query: 'trace_id:="$${__trace.traceId}"'
+
+  # Same store through its Tempo-compatible API (TraceQL); Grafana's Traces Drilldown only accepts Tempo datasources.
+  - name: VictoriaTraces (Tempo)
+    uid: victoriatraces-tempo
+    type: tempo
+    access: proxy
+    url: http://victoriatraces:10428/select/tempo
+    editable: false
+    jsonData:
+      tracesToLogsV2:
+        datasourceUid: victorialogs
+        spanStartTimeShift: '-5m'
+        spanEndTimeShift: '5m'
+        filterByTraceID: false
+        filterBySpanID: false
+        customQuery: true
+        query: 'trace_id:="$${__trace.traceId}"'
