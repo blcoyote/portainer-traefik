@@ -85,10 +85,11 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "max by (instance) (max_over_time(target_info{job=\"camera-events-v2\", instance=~\"$instance\"}[2m]))",
+          "expr": "max by (instance) (max_over_time(target_info{job=\"camera-events-v2\", instance=~\"$instance\"}[2m])) or max by (instance) (max_over_time(target_info{job=\"camera-events-v2\", instance=~\"$instance\"}[$__range])) * 0",
           "legendFormat": "{{instance}}",
           "refId": "A",
-          "range": true
+          "range": false,
+          "instant": true
         }
       ],
       "fieldConfig": {
@@ -119,17 +120,6 @@
                   "text": "DOWN",
                   "color": "red",
                   "index": 1
-                }
-              }
-            },
-            {
-              "type": "special",
-              "options": {
-                "match": "null",
-                "result": {
-                  "text": "DOWN",
-                  "color": "red",
-                  "index": 2
                 }
               }
             }
@@ -177,10 +167,11 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "max by (instance) (mqtt_connected{job=\"camera-events-v2\", instance=~\"$instance\"})",
+          "expr": "max by (instance) (last_over_time(mqtt_connected{job=\"camera-events-v2\", instance=~\"$instance\"}[2m])) or max by (instance) (max_over_time(target_info{job=\"camera-events-v2\", instance=~\"$instance\"}[$__range])) * 0",
           "legendFormat": "{{instance}}",
           "refId": "A",
-          "range": true
+          "range": false,
+          "instant": true
         }
       ],
       "fieldConfig": {
@@ -260,7 +251,8 @@
           "expr": "sum by (instance) (rate(http_server_request_duration_seconds_count{job=\"camera-events-v2\", instance=~\"$instance\"}[$__rate_interval]))",
           "legendFormat": "{{instance}}",
           "refId": "A",
-          "range": true
+          "range": false,
+          "instant": true
         }
       ],
       "fieldConfig": {
@@ -318,10 +310,11 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "sum by (instance) (rate(http_server_request_duration_seconds_count{job=\"camera-events-v2\", instance=~\"$instance\", http_response_status_class=\"5xx\"}[$__rate_interval])) / sum by (instance) (rate(http_server_request_duration_seconds_count{job=\"camera-events-v2\", instance=~\"$instance\"}[$__rate_interval]))",
+          "expr": "(sum by (instance) (rate(http_server_request_duration_seconds_count{job=\"camera-events-v2\", instance=~\"$instance\", http_response_status_class=\"5xx\"}[$__rate_interval])) or sum by (instance) (rate(http_server_request_duration_seconds_count{job=\"camera-events-v2\", instance=~\"$instance\"}[$__rate_interval])) * 0) / sum by (instance) (rate(http_server_request_duration_seconds_count{job=\"camera-events-v2\", instance=~\"$instance\"}[$__rate_interval]))",
           "legendFormat": "{{instance}}",
           "refId": "A",
-          "range": true
+          "range": false,
+          "instant": true
         }
       ],
       "fieldConfig": {
@@ -391,7 +384,8 @@
           "expr": "histogram_quantile(0.95, sum by (instance, le) (rate(http_server_request_duration_seconds_bucket{job=\"camera-events-v2\", instance=~\"$instance\", request_kind=\"page\"}[$__rate_interval])))",
           "legendFormat": "{{instance}}",
           "refId": "A",
-          "range": true
+          "range": false,
+          "instant": true
         }
       ],
       "fieldConfig": {
@@ -955,7 +949,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "sum by (instance) (increase(push_sends_total{job=\"camera-events-v2\", instance=~\"$instance\", outcome=\"failed\"}[1h])) / sum by (instance) (increase(push_sends_total{job=\"camera-events-v2\", instance=~\"$instance\"}[1h]))",
+          "expr": "(sum by (instance) (increase(push_sends_total{job=\"camera-events-v2\", instance=~\"$instance\", outcome=\"failed\"}[1h])) or sum by (instance) (increase(push_sends_total{job=\"camera-events-v2\", instance=~\"$instance\"}[1h])) * 0) / sum by (instance) (increase(push_sends_total{job=\"camera-events-v2\", instance=~\"$instance\"}[1h]))",
           "legendFormat": "{{instance}}",
           "refId": "A",
           "range": true
