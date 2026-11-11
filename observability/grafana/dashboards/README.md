@@ -7,3 +7,5 @@ Provisioned dashboards can't be saved from the UI. To change one, edit it in Gra
 **Share → Export → Save to file** and commit the JSON here.
 
 Use the datasource UIDs `victoriametrics` and `victorialogs` in panels so imported dashboards resolve.
+
+Dashboards: `camera-events-v2.json` (camera-events-v2 app: HTTP, MQTT, push, memory).
