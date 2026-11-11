@@ -77,7 +77,7 @@ it is on the network. Opt out with the label `logs.collect: "false"`.
 ## Dashboards
 
 - **Dashboards:** JSON files in [`grafana/dashboards/`](grafana/dashboards/); subfolders become folders.
-- **Datasource UIDs:** `victoriametrics` (Prometheus type, MetricsQL/PromQL) and `victorialogs` (LogsQL).
+- **Datasource UIDs:** `victoriametrics` (Prometheus type, MetricsQL/PromQL), `victorialogs` (LogsQL) and `victoriatraces` (Jaeger type, VictoriaTraces' Jaeger query API).
 
 Provisioned items are read-only in the UI. Make changes in Grafana, export them, and commit the file.
 
@@ -87,6 +87,12 @@ Alerting is switched off for now (`GF_UNIFIED_ALERTING_ENABLED: "false"` in the 
 
 - Logs: `{container="grafana"} error`, or `compose_project:observability` in LogsQL.
 - Metrics: `up` lists every scrape target (1 = up, 0 = down).
+
+- Log to trace: app logs are JSON lines with `trace_id`. The VictoriaLogs datasource has a `trace_id` derived field
+  (regex on the raw line), so log lines in Explore show a link that opens the trace in VictoriaTraces.
+- Trace to logs: open a trace in the VictoriaTraces datasource and use the span's "Logs" button; it runs a
+  VictoriaLogs query for lines containing the trace id (span time +/- 5 minutes). Equivalent by hand:
+  `{compose_service="app"} | unpack_json | trace_id:="<id>"`.
 
 ## Verifying traces
 
