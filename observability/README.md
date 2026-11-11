@@ -77,7 +77,9 @@ it is on the network. Opt out with the label `logs.collect: "false"`.
 ## Dashboards
 
 - **Dashboards:** JSON files in [`grafana/dashboards/`](grafana/dashboards/); subfolders become folders.
-- **Datasource UIDs:** `victoriametrics` (Prometheus type, MetricsQL/PromQL), `victorialogs` (LogsQL) and `victoriatraces` (Jaeger type, VictoriaTraces' Jaeger query API).
+- **Datasource UIDs:** `victoriametrics` (Prometheus type, MetricsQL/PromQL), `victorialogs` (LogsQL), `victoriatraces` (Jaeger type, for Explore) and `victoriatraces-tempo` (Tempo type on
+  VictoriaTraces' Tempo-compatible API: TraceQL and **Drilldown → Traces**, which only accepts Tempo datasources;
+  VictoriaTraces calls this support experimental).
 
 Provisioned items are read-only in the UI. Make changes in Grafana, export them, and commit the file.
 
