@@ -1,6 +1,11 @@
 # Traefik v3 static configuration
 # Dynamic routing is handled via Docker labels on individual services.
 
+global:
+  # Drop headers like X_Auth_User that alias X-Auth-User, so clients can't spoof headers
+  # Traefik or the CrowdSec bouncer set. Applies to all entrypoints.
+  aliasHeadersStrategy: delete
+
 api:
   dashboard: true
 
